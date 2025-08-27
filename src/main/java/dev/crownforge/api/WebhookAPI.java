@@ -1,7 +1,7 @@
-package me.mathie.api;
+package dev.crownforge.api;
 
-import me.mathie.classes.WebHookResponse;
-import me.mathie.manager.WebhookManager;
+import dev.crownforge.classes.WebHookResponse;
+import dev.crownforge.manager.WebhookManager;
 
 /**
  * API for sendin, deleting and editing Discord webhook messages.

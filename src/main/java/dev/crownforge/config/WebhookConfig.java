@@ -1,7 +1,7 @@
-package me.mathie.config;
+package dev.crownforge.config;
 
 import org.bukkit.configuration.file.FileConfiguration;
-import me.mathie.DiscordWebhook;
+import dev.crownforge.DiscordWebhook;
 
 import java.util.HashMap;
 import java.util.Map;

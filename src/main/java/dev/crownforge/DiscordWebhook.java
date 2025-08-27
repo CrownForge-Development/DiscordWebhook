@@ -1,6 +1,6 @@
-package me.mathie;
+package dev.crownforge;
 
-import me.mathie.config.WebhookConfig;
+import dev.crownforge.config.WebhookConfig;
 import org.bukkit.plugin.java.JavaPlugin;
 
 

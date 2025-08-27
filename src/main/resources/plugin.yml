@@ -1,5 +1,5 @@
 name: DiscordWebhook
-main: me.mathie.DiscordWebhook
+main: dev.crownforge.DiscordWebhook
 version: 1.0
 author: Mathie
 api-version: 1.21

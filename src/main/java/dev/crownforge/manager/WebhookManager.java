@@ -1,9 +1,9 @@
-package me.mathie.manager;
+package dev.crownforge.manager;
 
 import com.google.gson.JsonObject;
 import com.google.gson.Gson;
-import me.mathie.config.WebhookConfig;
-import me.mathie.classes.WebHookResponse;
+import dev.crownforge.config.WebhookConfig;
+import dev.crownforge.classes.WebHookResponse;
 import org.bukkit.Bukkit;
 
 import java.io.InputStream;

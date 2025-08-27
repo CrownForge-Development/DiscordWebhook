@@ -1,4 +1,4 @@
-package me.mathie.classes;
+package dev.crownforge.classes;
 
 /**
  * Represents the result of sending or deleting a Discord webhook message.
