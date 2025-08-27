@@ -1,0 +1,11 @@
+# DiscordWebhook plugin configuration
+
+webhooks:
+  # The "default" webhook is used if no specific key is provided or if the specific send fails.
+  default: "https://discord.com/api/webhooks/xxx/yyy"
+
+  # Add your own webhooks below.
+  # You can reference these by their key in your plugin calls or config.
+  # Example:
+  #   WebhookAPI.sendMessage("staff", "A staff action happened!");
+  staff: "https://discord.com/api/webhooks/aaa/bbb"
