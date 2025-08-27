@@ -1,6 +1,6 @@
 name: DiscordWebhook
 main: me.mathie.DiscordWebhook
-version: 1.1
+version: 1.0
 author: Mathie
 api-version: 1.21
 description: A plugin to send messages to Discord webhooks.

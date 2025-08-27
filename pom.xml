@@ -4,7 +4,7 @@
 
   <groupId>me.mathie</groupId>
   <artifactId>discordwebhook</artifactId>
-  <version>1.1</version>
+  <version>1.0</version>
   <packaging>jar</packaging>
 
   <name>DiscordWebhook</name>
@@ -12,8 +12,8 @@
   <distributionManagement>
     <repository>
       <id>github-Mathie</id>
-      <name>GitHub MathijsWouters Apache Maven Packages</name>
-      <url>https://maven.pkg.github.com/MathijsWouters/DiscordWebhook</url>
+      <name>GitHub Sanctum-Development Apache Maven Packages</name>
+      <url>https://maven.pkg.github.com/Sanctum-Development/DiscordWebhook</url>
     </repository>
   </distributionManagement>
 
