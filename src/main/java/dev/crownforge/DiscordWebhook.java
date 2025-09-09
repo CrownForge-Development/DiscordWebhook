@@ -1,8 +1,8 @@
 package dev.crownforge;
 
 import dev.crownforge.config.WebhookConfig;
+import dev.crownforge.manager.WebhookQueues;
 import org.bukkit.plugin.java.JavaPlugin;
-
 
 public class DiscordWebhook extends JavaPlugin {
 
@@ -18,6 +18,7 @@ public class DiscordWebhook extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        WebhookQueues.shutdownAll();
         getLogger().info("DiscordWebhook disabled!");
     }
 
