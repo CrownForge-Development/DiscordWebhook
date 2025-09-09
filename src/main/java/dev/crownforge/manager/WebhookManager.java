@@ -11,10 +11,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Future;
 
 /**
  * Handles sending, deleting, and editing messages via Discord webhooks.
- * Adds per-URL queuing and respectful rate-limit retries (429) with Retry-After.
+ * Adds per-URL queuing, gentle pacing, and respectful rate-limit retries (429).
  */
 public class WebhookManager {
 
@@ -22,6 +25,10 @@ public class WebhookManager {
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int READ_TIMEOUT_MS = 12000;
     private static final int MAX_RETRIES = 3;
+    private static final long MAX_BACKOFF_MS = 60_000L;
+    private static final long MIN_INTERVAL_MS = 350L;
+    private static final long JITTER_MS = 50L;
+    private static final ConcurrentMap<String, Long> NEXT_ALLOWED = new ConcurrentHashMap<>();
 
     // ---------------------------
     // Public API
@@ -37,17 +44,14 @@ public class WebhookManager {
         final String url = webhookUrl;
         try {
             // Serialize per-URL and auto-handle 429s
-            java.util.concurrent.Future<WebHookResponse> fut =
-                    WebhookQueues.submit(url, () -> sendWithRetries(url, content));
+            Future<WebHookResponse> fut = WebhookQueues.submit(url, () -> sendWithRetries(url, content));
             WebHookResponse resp = fut.get();
 
             // Fallback to default if primary failed and default differs
             if (!resp.isSuccess()) {
                 String def = WebhookConfig.getDefaultWebhookUrl();
                 if (def != null && !def.equals(url)) {
-                    WebHookResponse fallback =
-                            WebhookQueues.submit(def, () -> sendWithRetries(def, content)).get();
-                    return fallback;
+                    return WebhookQueues.submit(def, () -> sendWithRetries(def, content)).get();
                 }
             }
             return resp;
@@ -65,11 +69,10 @@ public class WebhookManager {
             return false;
         }
 
+        final String base = webhookUrl;
         final String target = webhookUrl + "/messages/" + messageId;
         try {
-            WebHookResponse resp = WebhookQueues
-                    .submit(webhookUrl, () -> deleteWithRetries(target))
-                    .get();
+            WebHookResponse resp = WebhookQueues.submit(base, () -> deleteWithRetries(base, target)).get();
             return resp.isSuccess();
         } catch (Exception e) {
             Bukkit.getLogger().severe("[DiscordWebhook] Error deleting webhook message: " + e.getMessage());
@@ -85,11 +88,10 @@ public class WebhookManager {
             return false;
         }
 
+        final String base = webhookUrl;
         final String target = webhookUrl + "/messages/" + messageId;
         try {
-            WebHookResponse resp = WebhookQueues
-                    .submit(webhookUrl, () -> editWithRetries(target, newContent))
-                    .get();
+            WebHookResponse resp = WebhookQueues.submit(base, () -> editWithRetries(base, target, newContent)).get();
             return resp.isSuccess();
         } catch (Exception e) {
             Bukkit.getLogger().severe("[DiscordWebhook] Error editing webhook message: " + e.getMessage());
@@ -125,14 +127,18 @@ public class WebhookManager {
     // Internal: network + retries
     // --------------------------------
 
-    private static WebHookResponse sendWithRetries(String webhookUrl, String content) {
+    private static WebHookResponse sendWithRetries(String baseWebhookUrl, String content) {
         int attempt = 0;
         while (true) {
             attempt++;
+
+            // Gentle pacing per webhook to avoid hitting 429s during bursts
+            pace(baseWebhookUrl);
+
             HttpURLConnection conn = null;
             try {
                 // wait=true makes Discord return the created message JSON (incl. "id")
-                conn = open(webhookUrl + "?wait=true", "POST");
+                conn = open(baseWebhookUrl + "?wait=true", "POST");
                 conn.setDoOutput(true);
 
                 JsonObject json = new JsonObject();
@@ -180,10 +186,13 @@ public class WebhookManager {
         }
     }
 
-    private static WebHookResponse deleteWithRetries(String targetUrl) {
+    private static WebHookResponse deleteWithRetries(String baseWebhookUrl, String targetUrl) {
         int attempt = 0;
         while (true) {
             attempt++;
+
+            pace(baseWebhookUrl);
+
             HttpURLConnection conn = null;
             try {
                 conn = open(targetUrl, "DELETE");
@@ -214,10 +223,13 @@ public class WebhookManager {
         }
     }
 
-    private static WebHookResponse editWithRetries(String targetUrl, String newContent) {
+    private static WebHookResponse editWithRetries(String baseWebhookUrl, String targetUrl, String newContent) {
         int attempt = 0;
         while (true) {
             attempt++;
+
+            pace(baseWebhookUrl);
+
             HttpURLConnection conn = null;
             try {
                 conn = open(targetUrl, "PATCH");
@@ -283,19 +295,45 @@ public class WebhookManager {
     }
 
     private static int getRetryAfterMillis(HttpURLConnection conn, String body) {
+        String resetAfter = conn.getHeaderField("X-RateLimit-Reset-After");
+        if (resetAfter != null) {
+            try {
+                int ms = (int) Math.ceil(Double.parseDouble(resetAfter.trim()) * 1000.0);
+                return (int) Math.min(ms, MAX_BACKOFF_MS);
+            } catch (Exception ignored) {}
+        }
+
         String h = conn.getHeaderField("Retry-After");
         if (h != null) {
-            try { return (int) Math.ceil(Double.parseDouble(h) * 1000.0); } catch (Exception ignored) {}
-            try { return Integer.parseInt(h) * 1000; } catch (Exception ignored) {}
+            try {
+                int ms = (int) Math.ceil(Double.parseDouble(h.trim()) * 1000.0);
+                return (int) Math.min(ms, MAX_BACKOFF_MS);
+            } catch (Exception ignored) {}
         }
+
         try {
             if (body != null && !body.isEmpty()) {
                 JsonObject obj = GSON.fromJson(body, JsonObject.class);
                 if (obj != null && obj.has("retry_after")) {
-                    return (int) Math.ceil(obj.get("retry_after").getAsDouble() * 1000.0);
+                    int ms = (int) Math.ceil(obj.get("retry_after").getAsDouble() * 1000.0);
+                    return (int) Math.min(ms, MAX_BACKOFF_MS);
                 }
             }
         } catch (Exception ignored) {}
+
+        // Small default
         return 1000;
+    }
+
+    /** Simple per-webhook pacer to smooth bursts and avoid immediate 429s. */
+    private static void pace(String baseWebhookUrl) {
+        long now = System.currentTimeMillis();
+        long next = NEXT_ALLOWED.getOrDefault(baseWebhookUrl, now);
+        if (next > now) {
+            try { Thread.sleep(next - now); } catch (InterruptedException ignored) {}
+            now = System.currentTimeMillis();
+        }
+        long jitter = (long) (Math.random() * JITTER_MS);
+        NEXT_ALLOWED.put(baseWebhookUrl, now + MIN_INTERVAL_MS + jitter);
     }
 }
