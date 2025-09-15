@@ -1,6 +1,6 @@
 package dev.crownforge.api;
 
-import dev.crownforge.classes.WebHookResponse;
+import dev.crownforge.Model.WebHookResponse;
 import dev.crownforge.manager.WebhookManager;
 
 /**
@@ -17,8 +17,13 @@ public class WebhookAPI {
      * @param message The message to send
      * @return WebHookResponse with status and optional messageId.
      */
+    @Deprecated
     public static WebHookResponse sendMessage(String webhookOrKey, String message) {
-        return WebhookManager.sendMessage(webhookOrKey, message);
+        final WebHookResponse[] responseHolder = new WebHookResponse[1];
+        WebhookManager.sendMessage(webhookOrKey, message, webHookResponse -> {
+            responseHolder[0] = webHookResponse;
+        });
+        return responseHolder[0];
     }
 
     /**
@@ -27,8 +32,13 @@ public class WebhookAPI {
      * @param messageId ID of the message to delete
      * @return true if deletion succeeded
      */
+    @Deprecated
     public static boolean deleteMessage(String webhookOrKey, String messageId) {
-        return WebhookManager.deleteMessage(webhookOrKey, messageId);
+        final Boolean[] responseHolder = new Boolean[1];
+        WebhookManager.deleteMessage(webhookOrKey, messageId , webHookResponse -> {
+            responseHolder[0] = webHookResponse.isSuccess();
+        });
+        return responseHolder[0] != null && responseHolder[0];
     }
 
     /**
@@ -38,8 +48,13 @@ public class WebhookAPI {
      * @param newContent New message content
      * @return true if edit succeeded
      */
+    @Deprecated
     public static boolean editMessage(String webhookOrKey, String messageId, String newContent) {
-        return WebhookManager.editMessage(webhookOrKey, messageId, newContent);
+        try {
+            return WebhookManager.editMessage(webhookOrKey, messageId, newContent);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

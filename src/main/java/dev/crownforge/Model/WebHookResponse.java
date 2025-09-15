@@ -1,4 +1,4 @@
-package dev.crownforge.classes;
+package dev.crownforge.Model;
 
 /**
  * Represents the result of sending or deleting a Discord webhook message.
