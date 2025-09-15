@@ -27,6 +27,18 @@ public class WebhookAPI {
     }
 
     /**
+     * Sends a message to a Discord webhook.
+     * Message gets added to a queue and sent but when failed the system will waitt 5 seconds before retrying.
+     * @param webhookOrKey Either a Discord webhook URL or a key from config.yml
+     * @param message The message to send
+     * @param callback Callback to handle the WebHookResponse
+     * @return WebHookResponse with status and optional messageId.
+     */
+    public static void sendMessageAsync(String webhookOrKey, String message, java.util.function.Consumer<WebHookResponse> callback) {
+        WebhookManager.sendMessage(webhookOrKey, message, callback);
+    }
+
+    /**
      * Deletes a message by ID via webhook.
      * @param webhookOrKey Discord webhook URL or key from config.yml
      * @param messageId ID of the message to delete
@@ -42,13 +54,25 @@ public class WebhookAPI {
     }
 
     /**
+     * Deletes a message by ID via webhook.
+     * delete action gets added to a queue and sent but when failed the system will waitt 5 seconds before retrying.
+     * @param webhookOrKey Discord webhook URL or key from config.yml
+     * @param messageId ID of the message to delete
+     * @param callback Callback to handle the WebHookResponse
+     * @return true if deletion succeeded
+     */
+    public static void deleteMessageAsync(String webhookOrKey, String messageId, java.util.function.Consumer<WebHookResponse> callback) {
+        WebhookManager.deleteMessage(webhookOrKey, messageId , callback);
+    }
+
+    /**
      * Edits a message sent by a webhook.
      * @param webhookOrKey Discord webhook URL or config key
      * @param messageId Message ID to edit
      * @param newContent New message content
      * @return true if edit succeeded
+     * @Warning This method could fail there is no async version of this method.
      */
-    @Deprecated
     public static boolean editMessage(String webhookOrKey, String messageId, String newContent) {
         try {
             return WebhookManager.editMessage(webhookOrKey, messageId, newContent);
