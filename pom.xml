@@ -9,6 +9,18 @@
 
   <name>DiscordWebhook</name>
 
+    <developers>
+        <developer>
+            <id>me.mathie</id>
+            <name>Mathie</name>
+            <email>your.email@example.com</email>
+        </developer>
+        <developer>
+            <id>dami</id>
+            <name>Dami</name>
+        </developer>
+    </developers>
+
   <distributionManagement>
     <repository>
       <id>dev.crownforge</id>
@@ -24,12 +36,6 @@
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>org.spigotmc</groupId>
-      <artifactId>spigot-api</artifactId>
-      <version>1.21-R0.1-SNAPSHOT</version>
-      <scope>provided</scope>
-    </dependency>
 
     <dependency>
       <groupId>com.google.code.gson</groupId>

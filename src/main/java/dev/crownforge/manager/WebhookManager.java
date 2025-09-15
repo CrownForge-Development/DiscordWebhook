@@ -2,14 +2,13 @@ package dev.crownforge.manager;
 
 import com.google.gson.JsonObject;
 import com.google.gson.Gson;
-import dev.crownforge.config.WebhookConfig;
 import dev.crownforge.classes.WebHookResponse;
-import org.bukkit.Bukkit;
 
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.logging.Logger;
 
 /**
  * Handles sending and deleting messages via Discord webhooks.
@@ -18,43 +17,30 @@ import java.net.URL;
  */
 public class WebhookManager {
 
+    private static final Logger logger = Logger.getLogger(WebhookManager.class.getName());
     /**
      * Tries to send a message to the given webhook (URL or config key).
      * If this fails, sends to the default webhook if one is set.
      * Returns a WebHookResponse with status, code, and (if present) messageId.
      *
-     * @param webhookOrKey Discord webhook URL or key from config.
+     * @param webhookUrl Discord webhook URL or key from config.
      * @param content The message content.
      * @return WebHookResponse object with status and optional messageId.
      */
-    public static WebHookResponse sendMessage(String webhookOrKey, String content) {
-        String webhookUrl = null;
-
-        if (webhookOrKey != null && webhookOrKey.startsWith("https://discord.com/api/webhooks/")) {
-            webhookUrl = webhookOrKey;
-            Bukkit.getLogger().info("[DiscordWebhook] sendMessage called with direct URL.");
-        } else {
-            webhookUrl = WebhookConfig.getWebhookUrl(webhookOrKey);
-            Bukkit.getLogger().info("[DiscordWebhook] sendMessage called with key: " + webhookOrKey);
-        }
+    public static WebHookResponse sendMessage(String webhookUrl, String content) {
 
         WebHookResponse response = null;
+
         if (webhookUrl != null) {
-            Bukkit.getLogger().info("[DiscordWebhook] Attempting to send to webhook: " + webhookUrl);
+            logger.info("[DiscordWebhook] Attempting to send to webhook: " + webhookUrl);
             response = sendToWebhook(webhookUrl, content);
         } else {
-            Bukkit.getLogger().warning("[DiscordWebhook] No valid webhook found for: " + webhookOrKey);
+            logger.warning("[DiscordWebhook] No valid webhook found for: " + webhookUrl);
             return new WebHookResponse(false, 0, null);
         }
 
         if (!response.isSuccess()) {
-            String defaultWebhook = WebhookConfig.getDefaultWebhookUrl();
-            if (defaultWebhook != null && !defaultWebhook.equals(webhookUrl)) {
-                Bukkit.getLogger().warning("[DiscordWebhook] Primary webhook failed, attempting default: " + defaultWebhook);
-                response = sendToWebhook(defaultWebhook, content);
-            } else {
-                Bukkit.getLogger().severe("[DiscordWebhook] No default webhook configured or already tried.");
-            }
+            logger.severe("[DiscordWebhook] No default webhook configured or already tried.");
         }
 
         return response;
@@ -90,13 +76,13 @@ public class WebhookManager {
             }
 
             responseCode = conn.getResponseCode();
-            Bukkit.getLogger().info("[DiscordWebhook] Code: " + responseCode);
+            logger.info("[DiscordWebhook] Code: " + responseCode);
 
             if (responseCode >= 200 && responseCode < 300) {
                 try (InputStream is = conn.getInputStream();
                      java.util.Scanner s = new java.util.Scanner(is, "UTF-8").useDelimiter("\\A")) {
                     String body = s.hasNext() ? s.next() : "";
-                    Bukkit.getLogger().info("[DiscordWebhook] Response body: " + body);
+                    logger.info("[DiscordWebhook] Response body: " + body);
 
                     JsonObject resp = new Gson().fromJson(body, JsonObject.class);
                     if (resp != null && resp.has("id")) {
@@ -108,7 +94,7 @@ public class WebhookManager {
             return new WebHookResponse(responseCode >= 200 && responseCode < 300, responseCode, messageId);
 
         } catch (Exception e) {
-            Bukkit.getLogger().severe("[DiscordWebhook] Error: " + e.getMessage());
+            logger.severe("[DiscordWebhook] Error: " + e.getMessage());
             e.printStackTrace();
             return new WebHookResponse(false, responseCode, null);
         }
@@ -118,39 +104,27 @@ public class WebhookManager {
      * Deletes a Discord webhook message.
      * Supports both direct webhook URLs and config keys.
      * If the first attempt fails, will fall back to the default webhook if one is set.
-     * @param webhookOrKey Discord webhook URL or key from config.
+     * @param webhook Discord webhook URL or key from config.
      * @param messageId Discord message ID to delete.
      * @return true if deletion succeeded, false otherwise.
      */
-    public static boolean deleteMessage(String webhookOrKey, String messageId) {
-        String webhookUrl;
-        if (webhookOrKey != null && webhookOrKey.startsWith("https://discord.com/api/webhooks/")) {
-            webhookUrl = webhookOrKey;
-            Bukkit.getLogger().info("[DiscordWebhook] deleteMessage called with direct URL.");
-        } else {
-            webhookUrl = WebhookConfig.getWebhookUrl(webhookOrKey);
-            Bukkit.getLogger().info("[DiscordWebhook] deleteMessage called with key: " + webhookOrKey);
+    public static boolean deleteMessage(String webhook, String messageId) {
+
+        if (webhook == null) {
+            logger.severe("[DiscordWebhook] No webhook found: " + webhook);
         }
 
-        if (webhookUrl == null) {
-            webhookUrl = WebhookConfig.getDefaultWebhookUrl();
-            if (webhookUrl == null) {
-                Bukkit.getLogger().severe("[DiscordWebhook] No webhook found for key: " + webhookOrKey);
-                return false;
-            }
-        }
-
-        String deleteUrl = webhookUrl + "/messages/" + messageId;
+        String deleteUrl = webhook + "/messages/" + messageId;
         try {
             URL url = new URL(deleteUrl);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("DELETE");
 
             int responseCode = connection.getResponseCode();
-            Bukkit.getLogger().info("[DiscordWebhook] Webhook delete response code: " + responseCode);
+            logger.info("[DiscordWebhook] Webhook delete response code: " + responseCode);
             return responseCode >= 200 && responseCode < 300;
         } catch (Exception e) {
-            Bukkit.getLogger().severe("[DiscordWebhook] Error deleting webhook message: " + e.getMessage());
+            logger.severe("[DiscordWebhook] Error deleting webhook message: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -158,25 +132,15 @@ public class WebhookManager {
 
     /**
      * Edits a previously sent Discord webhook message.
-     * @param webhookOrKey Discord webhook URL or config key
+     * @param webhookUrl Discord webhook URL or config key
      * @param messageId ID of the message to edit
      * @param newContent The new message content
      * @return true if edit succeeded, false otherwise
      */
-    public static boolean editMessage(String webhookOrKey, String messageId, String newContent) {
-        String webhookUrl;
-        if (webhookOrKey != null && webhookOrKey.startsWith("https://discord.com/api/webhooks/")) {
-            webhookUrl = webhookOrKey;
-        } else {
-            webhookUrl = WebhookConfig.getWebhookUrl(webhookOrKey);
-        }
+    public static boolean editMessage(String webhookUrl, String messageId, String newContent) {
 
         if (webhookUrl == null) {
-            webhookUrl = WebhookConfig.getDefaultWebhookUrl();
-            if (webhookUrl == null) {
-                Bukkit.getLogger().severe("[DiscordWebhook] No webhook found for key: " + webhookOrKey);
-                return false;
-            }
+            logger.severe("[DiscordWebhook] No webhook found: " + webhookUrl);
         }
 
         String editUrl = webhookUrl + "/messages/" + messageId;
@@ -196,10 +160,10 @@ public class WebhookManager {
             }
 
             int responseCode = connection.getResponseCode();
-            Bukkit.getLogger().info("[DiscordWebhook] Webhook edit response code: " + responseCode);
+            logger.info("[DiscordWebhook] Webhook edit response code: " + responseCode);
             return responseCode >= 200 && responseCode < 300;
         } catch (Exception e) {
-            Bukkit.getLogger().severe("[DiscordWebhook] Error editing webhook message: " + e.getMessage());
+            logger.severe("[DiscordWebhook] Error editing webhook message: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
